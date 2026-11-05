@@ -12,11 +12,139 @@ from utils.styling import apply_theme
 
 logger = get_logger(__name__)
 
+FEATURE_PAGES = {
+    "Activities": st.Page("pages/Activities.py", title="Activities"),
+    "Activity details": st.Page("pages/Activity.py", title="Activity"),
+    "Dashboard": st.Page("pages/Dashboard.py", title="Dashboard"),
+    "Analytics": st.Page("pages/Analytics.py", title="Analytics"),
+    "Race Pacing": st.Page("pages/RacePacing.py", title="Race Pacing"),
+    "Athlete": st.Page("pages/Athlete.py", title="Athlete"),
+    "Settings": st.Page("pages/Settings.py", title="Settings"),
+}
+
 
 def render_home() -> None:
     cfg = st.session_state["app_config"]
     st.title("Running Manager")
-    st.caption("Use the sidebar to navigate between pages.")
+    st.caption("Your running workspace, with quick access to every feature.")
+
+    features = [
+        (
+            "Activities",
+            "Browse your activity feed, review sessions, and link completed workouts.",
+            "\n".join(
+                [
+                    "       __",
+                    "  ____/  \\____",
+                    " /  _   RUN   \\",
+                    "|__/ \\_________|",
+                    "     _O_",
+                    "      |\\",
+                    "     / \\",
+                ]
+            ),
+        ),
+        (
+            "Activity details",
+            "Inspect a selected activity, its metrics, heart-rate zones, and route.",
+            "\n".join(
+                [
+                    " .------------------.",
+                    " |  HEART / PACE     |",
+                    " |  /\\  /\\  /\\      |",
+                    " | /  \\/  \\/  \\     |",
+                    " |       *          |",
+                    " '------------------'",
+                ]
+            ),
+        ),
+        (
+            "Dashboard",
+            "See training load, fitness trends, and activity performance at a glance.",
+            "\n".join(
+                [
+                    "       +------------------+",
+                    " 12 km |           ___    |",
+                    "  8 km |      /\\  /   \\   |",
+                    "  4 km |  ___/  \\/     \\  |",
+                    "    0  +------------------+",
+                    "        M  T  W  T  F  S",
+                ]
+            ),
+        ),
+        (
+            "Analytics",
+            "Compare planned and completed training across dates and activity types.",
+            "\n".join(
+                [
+                    " +----------------------+",
+                    " | PLAN  ----           |",
+                    " |      /    \\      ___ |",
+                    " | ACT /      \\____/    |",
+                    " +----------------------+",
+                    "   W23   W24   W25   W26",
+                ]
+            ),
+        ),
+        (
+            "Race Pacing",
+            "Build and review a pacing plan for a race course.",
+            "\n".join(
+                [
+                    "          /\\       !",
+                    "       __/  \\      |",
+                    "  ____/      \\____/|",
+                    " /                 |",
+                    "/__________________|",
+                    "  0km   10km   20km",
+                ]
+            ),
+        ),
+        (
+            "Athlete",
+            "Manage athlete profiles and training thresholds.",
+            "\n".join(
+                [
+                    "        .-.",
+                    "       (o o)",
+                    "        |=|",
+                    "      __| |__",
+                    "     /   |   \\",
+                    "         |",
+                    "        / \\",
+                    "       /   \\",
+                ]
+            ),
+        ),
+        (
+            "Settings",
+            "Configure integrations, metrics, and application preferences.",
+            "\n".join(
+                [
+                    "        .---.",
+                    "    ___/     \\___",
+                    "   /   /  _  \\   \\",
+                    "  |   | ( * ) |   |",
+                    "   \\   \\ ___ /   /",
+                    "    ---\\_____/---",
+                    "       |_____|",
+                    "      /_______\\",
+                ]
+            ),
+        ),
+    ]
+
+    for row_start in range(0, len(features), 3):
+        columns = st.columns(3)
+        for column, (title, description, icon) in zip(
+            columns, features[row_start : row_start + 3]
+        ):
+            with column:
+                with st.container(border=True):
+                    st.code(icon, language=None)
+                    st.subheader(title)
+                    st.write(description)
+                    st.page_link(FEATURE_PAGES[title], label=f"Open {title}")
 
     with st.expander("Environment (sanitized)", expanded=False):
         st.write(
@@ -42,16 +170,7 @@ def main():
     st.session_state.setdefault("mapbox_token", cfg.mapbox_token)
     logger.debug("cfg.mapbox: %s", cfg.mapbox_token)
 
-    pages = [
-        st.Page(render_home, title="Running Manager"),
-        st.Page("pages/Activities.py", title="Activities"),
-        st.Page("pages/Activity.py", title="Activity"),
-        st.Page("pages/Dashboard.py", title="Dashboard"),
-        st.Page("pages/Analytics.py", title="Analytics"),
-        st.Page("pages/RacePacing.py", title="Race Pacing"),
-        st.Page("pages/Athlete.py", title="Athlete"),
-        st.Page("pages/Settings.py", title="Settings"),
-    ]
+    pages = [st.Page(render_home, title="Running Manager"), *FEATURE_PAGES.values()]
     st.navigation(pages).run()
 
 
