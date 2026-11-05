@@ -105,7 +105,10 @@ with col1:
             timeseries_df = parse_gpx_to_timeseries(gpx_bytes)
 
             if timeseries_df.empty:
-                st.error("Erreur: Le fichier GPX ne contient pas assez de points de trace (< 100 points).")
+                st.error(
+                    "Erreur: Le fichier GPX doit contenir au moins 100 points "
+                    "de trace ou d'itinéraire."
+                )
             else:
                 st.session_state["race_pacing_timeseries"] = timeseries_df
 
