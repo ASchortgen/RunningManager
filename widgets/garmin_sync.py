@@ -36,7 +36,7 @@ def render_garmin_sync(
     days = st.number_input(
         "Jours à synchroniser avec Garmin",
         min_value=1,
-        max_value=365,
+        max_value=1000,
         value=14,
         step=1,
         key="garmin-sync-days",

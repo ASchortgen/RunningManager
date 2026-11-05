@@ -23,7 +23,6 @@ from utils.styling import apply_theme
 from utils.ui_helpers import trigger_rerun
 from widgets.garmin_sync import render_garmin_sync
 
-st.set_page_config(page_title="Running Manager - Settings")
 apply_theme()
 st.title("Settings")
 

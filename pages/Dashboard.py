@@ -43,7 +43,6 @@ from utils.redi import compute_ewma, compute_redi
 from utils.styling import apply_theme
 from widgets.athlete_selector import select_athlete
 
-st.set_page_config(page_title="Running Manager - Dashboard", layout="wide")
 apply_theme()
 st.title("Dashboard")
 
