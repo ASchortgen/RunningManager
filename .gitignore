@@ -19,3 +19,4 @@ data
 uv.lock
 requirements.lock.txt
 .cursor/mcp.json
+data/*
