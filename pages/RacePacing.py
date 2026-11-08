@@ -16,7 +16,13 @@ from graph.pacer_segments import render_pacer_segments
 from persistence.csv_storage import CsvStorage
 from services.pacer_service import PacerService
 from utils.config import load_config
-from utils.formatting import fmt_decimal, format_session_duration, set_locale
+from utils.formatting import (
+    fmt_decimal,
+    format_session_duration,
+    pace_min_km_to_speed_kmh,
+    set_locale,
+    speed_kmh_to_pace_min_km,
+)
 from utils.gpx_parser import parse_gpx_to_timeseries
 from utils.styling import apply_theme
 
@@ -301,6 +307,16 @@ if st.session_state["race_pacing_segments"] is not None and not st.session_state
     # Ensure all columns exist
     available_cols = [col for col in read_only_cols + editable_cols if col in segments_df.columns]
     display_df = segments_df[available_cols].copy()
+    if "speedEqKmh" in display_df.columns:
+        display_df["speedEqKmh"] = display_df["speedEqKmh"].map(
+            speed_kmh_to_pace_min_km
+        )
+        display_df = display_df.rename(columns={"speedEqKmh": "paceEqMinKm"})
+    if "speedKmh" in display_df.columns:
+        display_df["speedKmh"] = display_df["speedKmh"].map(
+            speed_kmh_to_pace_min_km
+        )
+        display_df = display_df.rename(columns={"speedKmh": "paceMinKm"})
 
     # Add avgGrade if available (convert to percentage for display)
     if "avgGrade" in segments_df.columns:
@@ -328,22 +344,30 @@ if st.session_state["race_pacing_segments"] is not None and not st.session_state
         column_config["avgGrade"] = st.column_config.NumberColumn("Pente (%)", disabled=True, format="%.1f")
     if "isAidSplit" in display_df.columns:
         column_config["isAidSplit"] = st.column_config.CheckboxColumn("RAV", disabled=True)
-    if "speedEqKmh" in display_df.columns:
-        column_config["speedEqKmh"] = st.column_config.NumberColumn(
-            "Vitesse Eq. (km/h)", min_value=0.0, step=0.1, format="%.1f"
+    if "paceEqMinKm" in display_df.columns:
+        column_config["paceEqMinKm"] = st.column_config.NumberColumn(
+            "Allure Eq. (min/km)",
+            min_value=2.0,
+            step=0.1,
+            format="%.1f",
+            help="Allure décimale : 5,5 correspond à 5 min 30 s/km.",
         )
-    if "speedKmh" in display_df.columns:
-        column_config["speedKmh"] = st.column_config.NumberColumn(
-            "Vitesse (km/h)", min_value=0.0, step=0.1, format="%.1f"
+    if "paceMinKm" in display_df.columns:
+        column_config["paceMinKm"] = st.column_config.NumberColumn(
+            "Allure (min/km)",
+            min_value=2.0,
+            step=0.1,
+            format="%.1f",
+            help="Allure décimale : 5,5 correspond à 5 min 30 s/km.",
         )
     if "timeSec" in display_df.columns:
         column_config["timeSec"] = st.column_config.NumberColumn("Temps (s)", disabled=True, format="%d")
 
     # Speed by type configuration section
     if not segments_df.empty and "type" in segments_df.columns:
-        with st.expander("⚙️ Définir les vitesses par type de segment", expanded=False):
+        with st.expander("⚙️ Définir les allures par type de segment", expanded=False):
             st.caption(
-                "Configurez les vitesses pour chaque type de segment. "
+                "Configurez l'allure en min/km pour chaque type de segment. "
                 "Cliquez sur 'Appliquer' pour mettre à jour tous les segments correspondants."
             )
             
@@ -362,33 +386,41 @@ if st.session_state["race_pacing_segments"] is not None and not st.session_state
                 
                 with col_type1:
                     speed_mode_key = f"speed_mode_{seg_type}"
+                    speed_modes = ["speedEqKmh", "speedKmh"]
                     speed_mode = st.selectbox(
-                        "Type de vitesse",
-                        ["speedEqKmh", "speedKmh"],
+                        "Type d'allure",
+                        speed_modes,
                         index=0 if st.session_state.get(speed_mode_key, "speedEqKmh") == "speedEqKmh" else 1,
                         key=speed_mode_key,
-                        label_visibility="collapsed"
+                        label_visibility="collapsed",
+                        format_func=lambda mode: (
+                            "Allure équivalente" if mode == "speedEqKmh" else "Allure"
+                        ),
                     )
-                    st.caption("Vitesse Eq." if speed_mode == "speedEqKmh" else "Vitesse")
+                    st.caption("Allure Eq." if speed_mode == "speedEqKmh" else "Allure")
                 
                 with col_type2:
-                    speed_value_key = f"speed_value_{seg_type}"
-                    # Get current average speed for this type or default to 0
+                    pace_value_key = f"pace_value_{seg_type}"
+                    # Keep persisted values in km/h; expose decimal min/km in the UI.
                     type_segments = segments_df[segments_df["type"] == seg_type]
                     if speed_mode == "speedEqKmh":
                         default_speed = float(type_segments["speedEqKmh"].mean()) if not type_segments.empty else 0.0
                     else:
                         default_speed = float(type_segments["speedKmh"].mean()) if not type_segments.empty else 0.0
+                    default_pace = speed_kmh_to_pace_min_km(default_speed) or 0.0
                     
-                    speed_value = st.number_input(
-                        "Valeur (km/h)",
+                    pace_value = st.number_input(
+                        "Allure (min/km)",
                         min_value=0.0,
                         step=0.1,
-                        value=float(st.session_state.get(speed_value_key, default_speed)),
-                        key=speed_value_key,
-                        label_visibility="collapsed"
+                        value=float(st.session_state.get(pace_value_key, default_pace)),
+                        key=pace_value_key,
+                        label_visibility="collapsed",
+                        help="Allure décimale : 5,5 correspond à 5 min 30 s/km.",
                     )
-                    st.caption(f"{speed_value:.1f} km/h")
+                    st.caption(
+                        f"{pace_value:.1f} min/km" if pace_value > 0 else "Allure non définie"
+                    )
                 
                 with col_type3:
                     count = len(type_segments)
@@ -396,21 +428,22 @@ if st.session_state["race_pacing_segments"] is not None and not st.session_state
                 
                 type_configs[seg_type] = {
                     "mode": speed_mode,
-                    "value": speed_value
+                    "value": pace_value
                 }
             
-            # Button to apply speeds by type
-            if st.button("✅ Appliquer les vitesses par type", key="apply_speeds_by_type_button", type="primary"):
+            # Button applies converted pace values to the internal speed columns.
+            if st.button("✅ Appliquer les allures par type", key="apply_speeds_by_type_button", type="primary"):
                 if not segments_df.empty:
                     updated_segments = segments_df.copy()
                     
                     # Apply speeds to segments based on their type
                     for seg_type, config in type_configs.items():
                         type_mask = updated_segments["type"] == seg_type
+                        speed_value = pace_min_km_to_speed_kmh(config["value"])
                         if config["mode"] == "speedEqKmh":
-                            updated_segments.loc[type_mask, "speedEqKmh"] = config["value"]
+                            updated_segments.loc[type_mask, "speedEqKmh"] = speed_value
                         else:
-                            updated_segments.loc[type_mask, "speedKmh"] = config["value"]
+                            updated_segments.loc[type_mask, "speedKmh"] = speed_value
                     
                     # Recompute all times based on updated speeds
                     for idx, row in updated_segments.iterrows():
@@ -423,7 +456,7 @@ if st.session_state["race_pacing_segments"] is not None and not st.session_state
                         updated_segments.at[idx, "timeSec"] = time_sec
                     
                     st.session_state["race_pacing_segments"] = updated_segments
-                    st.success("Vitesses appliquées et temps recalculés pour tous les segments!")
+                    st.success("Allures appliquées et temps recalculés pour tous les segments!")
                     st.rerun()
 
     edited_df = st.data_editor(display_df, column_config=column_config, hide_index=True, key="segments_editor")
@@ -439,8 +472,18 @@ if st.session_state["race_pacing_segments"] is not None and not st.session_state
                 
                 # Copy all speed values from edited_df (which has all user edits)
                 for idx in range(min(len(edited_df), len(updated_segments))):
-                    updated_segments.at[idx, "speedEqKmh"] = float(edited_df.iloc[idx].get("speedEqKmh", 0) or 0)
-                    updated_segments.at[idx, "speedKmh"] = float(edited_df.iloc[idx].get("speedKmh", 0) or 0)
+                    pace_eq = edited_df.iloc[idx].get("paceEqMinKm")
+                    pace = edited_df.iloc[idx].get("paceMinKm")
+                    updated_segments.at[idx, "speedEqKmh"] = (
+                        pace_min_km_to_speed_kmh(float(pace_eq))
+                        if pd.notna(pace_eq)
+                        else 0.0
+                    )
+                    updated_segments.at[idx, "speedKmh"] = (
+                        pace_min_km_to_speed_kmh(float(pace))
+                        if pd.notna(pace)
+                        else 0.0
+                    )
                 
                 # Recompute all times based on updated speeds
                 for idx, row in updated_segments.iterrows():

@@ -9,6 +9,7 @@ are for UI rendering only.
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import pandas as pd
@@ -77,6 +78,32 @@ def fmt_speed_kmh(speed_kmh: Optional[float]) -> str:
     if speed_kmh is None:
         return ""
     return f"{fmt_decimal(speed_kmh, 1)}{_nbsp()}km/h"
+
+
+def speed_kmh_to_pace_min_km(speed_kmh: Optional[float]) -> Optional[float]:
+    """Convert speed in km/h to decimal minutes per kilometer."""
+    if speed_kmh is None:
+        return None
+    try:
+        speed = float(speed_kmh)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(speed) or speed <= 0:
+        return None
+    return 60.0 / speed
+
+
+def pace_min_km_to_speed_kmh(pace_min_km: Optional[float]) -> float:
+    """Convert decimal minutes per kilometer to speed in km/h."""
+    if pace_min_km is None:
+        return 0.0
+    try:
+        pace = float(pace_min_km)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(pace) or pace <= 0:
+        return 0.0
+    return 60.0 / pace
 
 
 def to_str_storage(value: Optional[float], ndigits: Optional[int] = None) -> str:

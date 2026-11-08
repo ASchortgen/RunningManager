@@ -2,16 +2,21 @@
 SPDX-License-Identifier: GPL-3.0-or-later
 """
 
-import streamlit as st
 from pathlib import Path
 
-from utils.config import load_config
-from utils.constants import DEFAULT_HR_MAX, DEFAULT_HR_REST
-from utils.formatting import set_locale
-from utils.styling import apply_theme
+import streamlit as st
+
 from persistence.csv_storage import CsvStorage
 from persistence.repositories import AthletesRepo, ThresholdsRepo
+from utils.config import load_config
+from utils.constants import DEFAULT_HR_MAX, DEFAULT_HR_REST
+from utils.formatting import (
+    pace_min_km_to_speed_kmh,
+    set_locale,
+    speed_kmh_to_pace_min_km,
+)
 from utils.ids import new_id
+from utils.styling import apply_theme
 
 apply_theme()
 st.title("Athlete")
@@ -111,8 +116,18 @@ else:
     thr_df = thr_repo.list(athleteId=selected_athlete_id)
     if not thr_df.empty:
         st.write("Existing thresholds (edit inline):")
+        threshold_display = thr_df.copy()
+        threshold_display["Allure plate min (min/km)"] = threshold_display[
+            "paceFlatKmhMax"
+        ].map(speed_kmh_to_pace_min_km)
+        threshold_display["Allure plate max (min/km)"] = threshold_display[
+            "paceFlatKmhMin"
+        ].map(speed_kmh_to_pace_min_km)
+        threshold_display = threshold_display.drop(
+            columns=["paceFlatKmhMin", "paceFlatKmhMax"]
+        )
         edited = st.data_editor(
-            thr_df,
+            threshold_display,
             use_container_width=True,
             disabled=["thresholdId", "athleteId"],
             hide_index=True,
@@ -126,7 +141,12 @@ else:
                         tid = row.get("thresholdId")
                         if not tid:
                             continue
-                        thr_repo.update(str(tid), row.to_dict())
+                        payload = row.to_dict()
+                        pace_min = payload.pop("Allure plate min (min/km)")
+                        pace_max = payload.pop("Allure plate max (min/km)")
+                        payload["paceFlatKmhMin"] = pace_min_km_to_speed_kmh(pace_max)
+                        payload["paceFlatKmhMax"] = pace_min_km_to_speed_kmh(pace_min)
+                        thr_repo.update(str(tid), payload)
                     st.success("Threshold changes saved")
                     st.rerun()
                 except Exception as e:
@@ -175,10 +195,20 @@ else:
             hr_max = st.number_input("HR max", min_value=0, max_value=250, value=150)
         with col2:
             pace_min = st.number_input(
-                "Pace flat min (km/h)", min_value=0.0, max_value=30.0, value=8.0, step=0.1
+                "Allure plate min (min/km)",
+                min_value=2.0,
+                max_value=30.0,
+                value=5.0,
+                step=0.1,
+                help="Saisir une allure décimale : 5,5 correspond à 5 min 30 s/km.",
             )
             pace_max = st.number_input(
-                "Pace flat max (km/h)", min_value=0.0, max_value=30.0, value=12.0, step=0.1
+                "Allure plate max (min/km)",
+                min_value=2.0,
+                max_value=30.0,
+                value=7.5,
+                step=0.1,
+                help="Saisir une allure décimale : 7,5 correspond à 7 min 30 s/km.",
             )
             ascend_min = st.number_input(
                 "Ascent rate min (m/h)", min_value=0, max_value=10000, value=0
@@ -196,8 +226,8 @@ else:
                     "name": th_name,
                     "hrMin": hr_min,
                     "hrMax": hr_max,
-                    "paceFlatKmhMin": pace_min,
-                    "paceFlatKmhMax": pace_max,
+                    "paceFlatKmhMin": pace_min_km_to_speed_kmh(pace_max),
+                    "paceFlatKmhMax": pace_min_km_to_speed_kmh(pace_min),
                     "ascentRateMPerHMin": ascend_min,
                     "ascentRateMPerHMax": ascend_max,
                 }
